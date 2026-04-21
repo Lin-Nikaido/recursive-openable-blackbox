@@ -82,7 +82,7 @@ def read_message(user_mail: str):
 トリッキーなワンライナーでもない。巧妙なメタプログラミングでもない。抽象化のための抽象化でもない。  
 
 美しいコードとは、 **世界の構造がそのまま表現されているコード** だ。  
-そしてエンジニアの本懐とは、 **世界を構造化すること** である。
+そしてエンジニアの本懐とは、 **世界を美しく構造化すること** である。
 
 つまり  
 - 責務の境界をどこに置くのか。  
@@ -546,12 +546,12 @@ def get_user(user_name) -> dict:
 ```
 
 せめて、 **せめて** だ。  
-`isinstance(user, AdminUser)`で判定すべきだろう。userがAdminかどうか判定するのに、attributeをアテにするなんてくるっている。  
-こういう実装をしているときの脳内はこうだろう
+`isinstance(user, AdminUser)`で判定すべきだろう。userがAdminかどうか判定するのに、attributeをアテにするなんて狂っている。  
+そしてこういう実装をしているときの脳内はこうだろう。
 1. 要件より、AdminUserには、`last_login_datetime`が必要だ。
-2. APIとして返すときに、`datetime` objectは JSON serializable出ないので、別で作らなくては
+2. APIとして返すときに、`datetime` objectは JSON serializableでないので、別で作らなくては
 3. `AdminUser.to_dict`を作ろう
-4. (大抵ここで、エラーに当たって)
+4. (大抵はここで、エラーに当たって)
 5. `user`として取得したuserの中に、`AdminUser`が含まれていると、`TypeError: Object of type datetime is not JSON serializable` になる。
 6. 回避するために、`to_dict`があれば、そっちを優先して、無ければ、普通に `user.model_dump`を呼ぼう。
 
@@ -592,31 +592,246 @@ def get_user(user_name) -> dict:
 
 `pydantic`の`serializer`を知らなかったとしての、不完全なコードでも、前者と後者では、全く違う。  
 後者は、「`user`には統一された辞書型を取得する手段がある」という点で、美しく世界を切り取れている。この人には、単に`pydantic`の`serializer`の仕組みのリンクを送れば済む。  
-前者の実装をした人には、「何故君にはそんな風に世界が見えているんだい？」と小一時間問い詰めてやらねばならぬだろう。
+前者の実装をした人には、「何故君にはそんな風に世界が見えているんだい？」と小一時間問い詰めてやらなきゃならないだろう。
 
+この章で伝えたいのは、個々のテクニックの是非ではない。 遅延 import が悪いわけでも、三項演算子が悪いわけでも、hasattr が常に悪というわけでもない。  
+問題は、それらが必要になっている 理由 だ。  
+ほとんどの場合、cheat は設計の歪みを知らせるシグナルとして現れる。
 
-外部ライブラリの非公開メソッドを使って無理やり実現しているケース。(DIの場所が早すぎたり、遅すぎたり)
-if文が大量に必要になった結果、複雑かつ一見オシャレにさえ見える三項関演算子やらonelinerやらを多用しているとき。関数内関数内関数。
-`hasattr`を使って結果を分類しているケース。文字列の先頭や最後、時にはドラスティックな分割結合の芸術により、値を再構築している例等、枚挙にいとまがない。
-後半は、なんならコード実装に詳しい部分をひけらかして、わざとやる人もいて、余計タチが悪い。
-合わせて少し抽象化して、記憶に残る学びになるようにする。
+- import 順序を調整しないと型が定義できない
+- attribute の有無を実行時に調べないと型が扱えない
+- 一つの関数で複数の責務を扱わざるを得ない
+- 型ではなく文字列や dict の形で意味を再構築している
+
+こうした状況では、コードは徐々に注釈や付随する説明が必要になってくる。
+コメントが増え、docstring が長くなり、注意書きが増え、例外処理が増え、条件分岐が増える。
+
+逆に、構造が自然であれば、コードは静かになる。
+
+特別なテクニックは要らない。  
+実行順序に依存しない。  
+属性の有無を探らなくてよい。  
+型を見れば意味がわかる。  
+関数名を見れば責務がわかる。  
+呼び出し順を追えば処理の流れがわかる。  
+
+つまり、 構造が正しければ、コードは **普通** になる。  
+そして「普通であること」は、ソフトウェアにおいて非常に価値が高い。
+
+普通のコードは、読み手を選ばない。 将来の自分を裏切らない。
+
+一方で、cheat に依存したコードは、書いた本人しか扱えなくなる。 書いた本人がいなくなると、誰も触れなくなる。  
+そして触れないコードは、変更されないコードになる。変更されないコードは、いずれ現実と乖離する。
+
+だから、何か特別なテクニックを思いついたときほど、一度立ち止まるべきだ。
+「もっと賢く書く方法はないか」ではなく、  
+「そもそも、この分割は自然か？」  
+と問い直す。
+
+多くの場合、本当に必要なのはテクニックではない。世界を美しく切り取り、再構成する事だ。  
+「テクニックを使うな」という意味ではない。自然に分割された構造では、ほとんどのテクニックは **必要なくなる** 。という意味だ。
 
 ## Do not explain. The code does.
-これも実際の実例をもとに大きすぎる関数や、複数個所でほとんど同様の実装をしている例等を取り上げたい。
-型(オブジェクト)定義が弱く、また本質的に違う要素を同じ変数で受け取っているため、詳細かつ複雑に引数やその関数の動きについてdocstringを書いている例。
-変数そのものにコメントを書いているとき。処理をブロックごとにコメントで区切っているとき。というかほとんどすべてのコメントは悪だと思う。
-また、長すぎるdocstringや、flatに多すぎる引数とそのそれぞれの説明のセット。Aの時にだけ使えるBとCのOption引数とか。
+PEP8には,以下のような記載がある。多くのコーディングスタイルにも近い記載はあるだろう。
+> Inline comments are unnecessary and in fact distracting if they state the obvious.`  
+> Don’t do this:
+> ```python
+> x = x + 1  # Increment x
+> ```
+これは確かに、最低だ。このコメントを保存するために消費された情報量一つ一つに謝るべきだ。
+
+一方で、こんなコードはどうだろうか。
+```python
+def process_user_data(
+    data: dict,
+    include_history: bool = False,
+    history_limit: int | None = None,
+    include_orders: bool = False,
+    include_payment_info: bool = False,
+    include_subscription: bool = False,
+    include_deleted: bool = False,
+) -> dict:
+    """
+    Process user data and optionally include related resources.
+
+    Parameters
+    ----------
+    data : dict
+        user data dict returned from API.
+        expected keys:
+            id : str
+            name : str
+            created_at : isoformat str
+
+    include_history : bool
+        include login history list
+
+    history_limit : int | None
+        max history records to include
+        only used when include_history=True
+
+    include_orders : bool
+        include order list
+
+    include_payment_info : bool
+        include payment information
+
+    include_subscription : bool
+        include subscription info
+
+    include_deleted : bool
+        include logically deleted resources
+    
+    Returns
+    -------
+    result : dict
+        id: user id
+        name: user name
+        history: user login history
+        orders: user orders
+        payment: payment info
+        subscription: subscription info
+    """
+
+    result = {}
+
+    # basic fields
+    result["id"] = data["id"]
+    result["name"] = data["name"]
+
+    # include history if requested
+    if include_history:
+        history = load_login_history(data["id"])
+
+        if history_limit:
+            history = history[:history_limit]
+
+        result["history"] = history
+
+    # include orders if requested
+    if include_orders:
+        orders = load_orders(data["id"])
+
+        if not include_deleted:
+            orders = [o for o in orders if not o["deleted"]]
+
+        result["orders"] = orders
+
+    # include payment info
+    if include_payment_info:
+        result["payment"] = load_payment_info(data["id"])
+
+    # include subscription info
+    if include_subscription:
+        result["subscription"] = load_subscription(data["id"])
+
+    return result
+```
+
+コメントは別に読めばわかる実装を説明しているわけではなく。  
+むしろ、コメントのおかげで、コード実装からは分からない、それぞれのフェーズで何をするのかを明確にする助けになっている。  
+それに暴騰のdocstringに、包括的な情報があり、それぞれの引数がどんな役割をするのかがわかる。
+
+問題は、 読めば分かるという部分だ。 **読めば** だ。誰がこんなコードを読むだろうか、悪いが私はごめんだ。
+
+引数の`data: dict # user data dict returned from API.`というコメントは、引数の名前を `user_data`とすれば分かるし。 もっと言えば、APIから返ってくるuserの情報を正しく格納する`User`オブジェクトを定義して、`user: User`とでもしておけばもっと明確だ。
+
+このような、コードで分かりづらい物をコメントで補足するような方法は、 冒頭で言及されていた、
+```python
+x = x + 1  # Increment x
+```
+これと対比すれば、
+```python
+import ctypes
+
+# Increment x
+mask = 1
+while mask != 0:
+    carry = x & mask
+    x = x ^ mask
+    mask = carry << 1
+```
+のようなものだ、わざわざわかりづらい実装にして、コメントでわざわざ補足している。  
+確かにこの実装は、コメントが必要だ。ただ、コメントの前に、そんなに複雑に実装する必要がない。
+
+変数そのものにコメントを書いているとき。処理をブロックごとにコメントで区切っているとき。というかほとんどすべてのコメントは悪だ。  
+説明を必要とするコードとは裏を返せば、説明がなければ理解できないコードである。
+
+```python
+def build_user_view(user_id: str) -> UserView:
+    profile = get_user_profile(user_id)
+    orders = get_user_orders(user_id)
+
+    return UserView(
+        profile=profile,
+        orders=orders,
+    )
+
+def get_user_profile(user_id: str) -> UserProfile:
+    return user_repository.get(user_id)
+
+
+def get_user_orders(user_id: str) -> list[Order]:
+    return order_repository.list_by_user(user_id)
+
+
+def get_login_history(user_id: str, limit: int | None = None) -> list[LoginHistory]:
+    history = history_repository.list_by_user(user_id)
+
+    if limit:
+        history = history[:limit]
+
+    return history
+```
+
+このようにそれぞれの **自然な** 切れ目で機能を分割し、BlackBox　にしまって名前を付けるだけで、読みやすくなる。  
+それぞれの入出力に対してスキーマを定義して、意味づけすると、`data`って何？というような疑問はそもそもわかない。　　
+必要な処理を自然に区切り、関数名をつけてOpenableBlackBoxにすれば、コードをコメントでブロックにわけ整理する動機はなくなる。
+
+決して小粋なことはしていない。自然に世界を切り取ると説明は基本的に不要になる。正確には、コードそのものが実装の説明になる。  
+もしも、自身のコードに何か説明をしたくなった時、それは検討の足りないアーキテクチャの解読を後の誰かに擦り付ける為の君の怠惰出ないと120%確信が持てるかどうか
+改めて自身に問いかけるチャンスだ。  
+
+当然だkが、コードは書く人よりも読む人の方が圧倒的に多い。  
+つまり君一人の怠惰で美しくないコードの説明を書いたとすると。
+その怠惰のせいで、少なく見積もって未来の君を含む数十人が、その美しくないコードをコメントを手掛かりに嗚咽しながら理解コストを書けることになる。  
+これは、無差別テロといって差支えない。
+
+忘れてくれるな、エンジニアの本懐は **世界を美しく構造化すること** だ。
+
 
 ## Do not write documentation. You already wrote the code, right?
-最後に、コード以外に書かれるdocumentationについても触れたい。基本的にすべて悪だ。
-コード以外の部分、例えば前提としている開発環境や、秘密鍵、あとはプロジェクトそのものの思想やUXデザインなんかは必要だと思うが。
-あとは開発した年と自分の名前でも記念に書いておけばそれで十分だ。それとオシャレなロゴだな。  
-何より、何かコードについての説明をdocumentationに書くということは、保守すべきものを増やしていることに他ならない。
-そしてdocumentationは大抵version管理の外だ。印刷されファイルに立派にしまわれてしまった日には、コードが変更されたときのその紙に書いてある説明は誰かがボールペンで修正してくれるのかい？  
-君が徹夜で書いて印刷したその紙ドキュメントはそのうち嘘だらけになり、誰かを混乱させる。尻でも拭いて便器に流した方がよっぽどましだ。  
-当たり前だが、プログラムはコードに書いてある通りに動く。コードは仕様の一次情報だ。それにそれはいつでも変わる。誰かの何かを良くするために。  
-わざわざ2次情報としてtypoのリスクを抱えながら、同じことを書いて、コードの変更の度に修正をする羽目になる。少なくとも、documentationを変更する必要があるかどうか確認するハメには必ずなる。  
-さらに悪いことに、絶対にそのdocumentationと実際に動いているコードにはそのうち差分が発生する。「嘘のコメントは無いよりひどい」というがdocumentationはその最たる例だ。  
+最後に、コード以外に書かれるdocumentationについても触れたい。  
+基本的にすべて悪だ。
+
+コード以外の部分、例えば前提としている開発環境や、秘密鍵の取り扱い、あとはプロジェクトそのものの思想やUXデザインなんかは必要だと思うが。
+あとは開発した年と自分の名前でも記念に書いておけばそれで十分だ。それとオシャレなロゴだな。
+
 ただしもちろん技術の流出を嫌って顧客や世間に開示する用の開かないBlackboxの説明としてのdocumentationを否定するものではない。  
-まあただそれを書くのはエンジニアの仕事ではないからどちらにせよ、我々エンジニアには関係のない話だが。
+また、OpenableBlackBoxの再外核となる entry point に対する説明は有用だとも思う。例えば、API referenceが代表的であろう。
+
+今回言及したいのは、**ソフトウェアの実装を理解するために書かれるドキュメント群** についてだ。
+何より、何かコードについての説明をdocumentationに書くということは、保守すべきものを増やしていることに他ならない。
+そしてdocumentationは大抵version管理の外だ。  
+印刷されファイルに立派にしまわれてしまった日には、コードが変更されたときのその紙に書いてある説明は誰かがボールペンで修正してくれるのかい？  
+君が徹夜で書いて印刷したその紙ドキュメントはそのうち嘘だらけになり、誰かを混乱させる。尻でも拭いて便器に流した方がよっぽどましだ。  
+
+当たり前だが、プログラムはコードに書いてある通りに動く。  
+コードは仕様の一次情報だ。それにそれはいつでも変わる。誰かの何かを良くするために。    
+わざわざ2次情報documentationを書いたとして、typoのリスクを抱えながら、同じことを書いて、コードの変更の度に修正をするハメになる。  
+少なくとも、documentationを変更する必要があるかどうか確認するハメには必ずなる。  
+さらに悪いことに、絶対にそのdocumentationと実際に動いているコードにはそのうち差分が発生する。「嘘のコメントは無いよりひどい」というがdocumentationはその最たる例だ。
+
+これでもまだ、不必要ドキュメント執筆罪に手を染めるエンジニアの一定数には、  
+「私のコードを読んでもらっても理解してもらえないかもしれない。」という不安があるのかもしれない。  
+
+君は仲間をみくびりすぎだ。 君のチームのエンジニアをもっと信頼して、そして期待していい。  
+君が一生懸命検討した美しいコードであれば、君の友人はきっと読んで理解できるし、理解できるスキルレベルを求めるべきだ。  
+
+さらにもし、君の信頼する友人が君のコードでわからないところがあったとすれば、それはチャンスだ。  
+きっと、うまくない設計や構造が隠れていて、友人が教えてくれているということに他ならない。  
+これはコードが持続的に成長するにあたり、非常によくある、そして放置すると大きな癌に成長する小さなほころびだ。大きくなる前に手を打てる。  
+またそういった議論をもとに、責務分離が不明確な部分が見つかったり、過剰に責務を持っている関数が見つかったりもする。
+
 繰り返すが、既に読めばわかるものにわざわざ説明を書いて、しかもそれが未来のエンジニアに嘘を吹聴するなんて犯罪に手を染めないでほしい。
+
